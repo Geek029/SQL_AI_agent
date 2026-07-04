@@ -1,0 +1,180 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Hi there! 👋\nI'm your SQL buddy. What insights do you need?",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5e8ef860-1b76-4fef-b5ca-fcd3f6668bc4",
+      "name": "When chat message received",
+      "webhookId": "758d2bec-5d42-4b2d-af7d-cf261d77e127"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a PostgreSQL SQL assistant.\n\nDatabase schema:\n{{schema}}\n\nRules:\n- Only use available tables and columns\n- Never invent columns\n- If data required to answer does not exist, say:\n  \"No data available to answer the question\"\n- Return ONLY SQL query\n- Use PostgreSQL syntax\n- Limit results to 100 rows unless aggregation\n\nFor every user request:\n\n1. Call Fetch Schema.\n2. Read the schema.\n3. Generate SQL using only columns returned by the schema.\n4. Execute the query.\n\nDo not skip step 1.\n\nYou are a read-only database assistant.\n\nRules:\n- Only generate SELECT statements.\n- Never generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT, REVOKE, or EXECUTE statements.\n- If a user requests data modification, explain that the database is read-only."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        352,
+        0
+      ],
+      "id": "faec85c2-2dc3-439f-a4cf-351444f38311",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        224
+      ],
+      "id": "ec5beca9-cc55-447a-832c-7eedb3109550",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "aECwuSspfLjJOFwW",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "REQUIRED FIRST STEP.\n\nUse this tool before every SQL query.\nThis tool returns all available tables and columns.\nNever generate SQL without first calling this tool.",
+        "operation": "executeQuery",
+        "query": "SELECT\n  table_name,\n  column_name,\n  data_type,\n  is_nullable\nFROM information_schema.columns\nWHERE table_schema = 'public'\nORDER BY table_name, ordinal_position;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        544,
+        240
+      ],
+      "id": "2a759758-31b0-4ec5-baea-de77eb3fce16",
+      "name": "Fetch schema",
+      "credentials": {
+        "postgres": {
+          "id": "rCtd8TrFUpJ9gj9O",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Execute read-only PostgreSQL queries.\n\nInput:\nquery\n\nRules:\n- Query must be a SELECT statement.\n- Reject any INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, TRUNCATE, GRANT, REVOKE, or EXECUTE statements.\n- This tool is for data retrieval only.\n- If you extract a year out of a date column, then convert the year to TEXT format",
+        "operation": "executeQuery",
+        "query": "{{ $fromAI(\"query\") }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        720,
+        208
+      ],
+      "id": "ce99fc3a-9d7a-46b7-a592-f0e401be8b9d",
+      "name": "query executor",
+      "credentials": {
+        "postgres": {
+          "id": "rCtd8TrFUpJ9gj9O",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        368,
+        208
+      ],
+      "id": "3212f0b6-ecea-4fd4-94b9-a1798bf12969",
+      "name": "Simple Memory"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch schema": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "query executor": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
